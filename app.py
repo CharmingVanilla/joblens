@@ -29,10 +29,10 @@ column_map = {
     }
 }
 
-# 选择语言
+# choose your language
 language = st.radio("🌐 选择语言 / Select Language", ["中文", "English"], horizontal=True)
 
-# 文本内容字典
+# text dictionary
 T = {
     "中文": {
         "title": "JobLens 瑞典招聘信息分析仪 🇸🇪",
@@ -84,33 +84,33 @@ T = {
     }
 }
 
-# 显示页面标题和描述
+# page title and description
 st.title(T[language]["title"])
 st.write(T[language]["desc"])
 
-# 用户输入
+# input of user
 keyword = st.text_input(T[language]["input_keyword"], "data scientist")  # 创建文本框
 limit = st.slider(T[language]["slider_label"], 10, 100, 20)  # 创建滑动条
 
-# --- 页面加载时自动加载之前保存的数据 ---
+# --- Automatically load previously saved data when the page loads ---
 df = None
 if "df" in st.session_state:
     df = st.session_state["df"]
 
-# --- 当点击按钮时 ---
-if st.button(T[language]["start_button"]):  #创建一个按钮 并在点击后触发下面的内容
-    with st.spinner(T[language]["start_searching"]):  #创建动画
-        # 构造 API 请求地址
+# --- When clicking the button ---
+if st.button(T[language]["start_button"]):
+    with st.spinner(T[language]["start_searching"]):
+        # Constructing the API request address
         url = f"https://jobsearch.api.jobtechdev.se/search?q={keyword}&limit={limit}"
-        headers = {"Accept": "application/json"}  #我只接收json数据的格式
+        headers = {"Accept": "application/json"}
 
         response = requests.get(url, headers=headers)
 
         if response.status_code == 200:
             data = response.json()
 
-            # 提取有用字段
-            jobs = data.get("hits", [])  #hits是岗位表 在返回的json中可以知道
+            # Extracting useful fields
+            jobs = data.get("hits", [])
             if not jobs:
                 st.warning(T[language]["no_result"])
             else:
@@ -118,17 +118,17 @@ if st.button(T[language]["start_button"]):  #创建一个按钮 并在点击后�
                 for job in jobs:
                     desc_text = job.get("description", {}).get("text", "").lower()
 
-                    # 初始化标签列表
+                    # initial label list
                     skills = []
                     job_type = ""
                     job_language = ""
 
-                    # 技能匹配
+                    # Skill Matching
                     for skill in ["python", "sql", "excel", "java", "machine learning", "aws", "r", "docker"]:
                         if skill in desc_text:
                             skills.append(skill.upper())
 
-                    # 工作类型匹配
+                    # Work type Matchin
                     if "full-time" in desc_text or "heltid" in desc_text:
                         job_type = T[language]["full_time"]
                     elif "part-time" in desc_text or "deltid" in desc_text:
@@ -136,21 +136,21 @@ if st.button(T[language]["start_button"]):  #创建一个按钮 并在点击后�
                     elif "internship" in desc_text or "praktik" in desc_text:
                         job_type = T[language]["internship"]
 
-                    # 语言要求
+                    # Job language requirement
                     if "english" in desc_text:
                         job_language = T[language]["english"]
                     elif "swedish" in desc_text or "svenska" in desc_text:
                         job_language = T[language]["swedish"]
 
-                    # 原始字符串
+                    # get publication and application list
                     published_raw = job.get("publication_date")
                     deadline_raw = job.get("application_deadline")
 
-                    # 初始化
+                    # initial string
                     published = ""
                     deadline = ""
 
-                    # 发布时间：只显示日期
+                    # publication time：only date
                     if published_raw:
                         try:
                             dt_pub = datetime.fromisoformat(published_raw)
@@ -158,7 +158,7 @@ if st.button(T[language]["start_button"]):  #创建一个按钮 并在点击后�
                         except:
                             published = ""
 
-                    # 截止时间：保留完整时间
+                    # deadline：date and time
                     if deadline_raw:
                         try:
                             dt_deadline = datetime.fromisoformat(deadline_raw)
@@ -181,9 +181,9 @@ if st.button(T[language]["start_button"]):  #创建一个按钮 并在点击后�
 
                     job_list.append(job_info)
 
-                # 转换为 DataFrame
+                # transfer toDataFrame
                 df = pd.DataFrame(job_list)
-                st.session_state["df"] = df  # ✅ 保存数据到会话中
+                st.session_state["df"] = df  # save the data
 
                 # 显示表格
                 #st.success(f"共找到 {len(df)} 个职位：")
@@ -192,7 +192,7 @@ if st.button(T[language]["start_button"]):  #创建一个按钮 并在点击后�
             st.error(T[language]["API_error"])
 
 if df is not None and not df.empty:
-    # 按标签筛选岗位
+    # Filter jobs by tag
     st.subheader(T[language]["filter_title"])
 
     skill_options = sorted(set(skill for s in df["技能标签"] for skill in s.split(", ") if s))
@@ -224,30 +224,30 @@ if df is not None and not df.empty:
 
     st.write(T[language]["result_count"].format(len(filtered_df)))
 
-    # 将职位列变成带链接的 markdown 超链接
+    # Convert the job title column into a markdown hyperlink with a link
     filtered_df["职位"] = filtered_df.apply(
         lambda row: f"[{row['职位']}]({row['链接']})" if pd.notna(row["链接"]) else row["职位"],
         axis=1
     )
 
-    # 删除原始“链接”列
+    # Remove the original "Link" column
     filtered_df.drop(columns=["链接"], inplace=True)
 
-    # 切换表头列名
+    # change column name according to web language
     filtered_df.rename(columns=column_map[language], inplace=True)
 
-    # 展示表格
+    # show the column
     st.markdown(filtered_df.to_markdown(index=False), unsafe_allow_html=True)
 
     # CSV 下载按钮
     csv = filtered_df.to_csv(index=False).encode("utf-8")
     st.download_button(T[language]["download_button"], csv, file_name="jobs.csv", mime="text/csv")
 
-    # 词云图
+    # Word Cloud
     if not df.empty:
         st.subheader(T[language]["wordcloud_title"])
 
-        # 拼接所有职位标题
+        # concat the job title
         text = " ".join(df["职位"].dropna().astype(str))
 
         stopwords = set(["for", "and", "to", "with", "of", "in", "the", "a", "on", "as"])
@@ -258,7 +258,7 @@ if df is not None and not df.empty:
         ax.axis("off")
         st.pyplot(fig)
 
-    # 城市分布图
+    # City distribution map
     if not df.empty:
         st.subheader(T[language]["city_title"])
 
